@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maturalny Trener Matematyki</title>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Applying Poppins font to the body */
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        /* Custom styles for answer buttons to avoid conflicts with Astra theme */
+        .quiz-option-btn {
+            transition: all 0.2s ease-in-out;
+            border: 2px solid transparent;
+        }
+        .quiz-option-btn.selected {
+            border-color: #3b82f6; /* blue-500 */
+            background-color: #dbeafe; /* blue-100 */
+            transform: scale(1.02);
+        }
+        .quiz-option-btn.correct {
+            background-color: #dcfce7 !important; /* green-100 */
+            border-color: #22c55e !important; /* green-500 */
+            color: #15803d; /* green-700 */
+        }
+        .quiz-option-btn.incorrect {
+            background-color: #fee2e2 !important; /* red-100 */
+            border-color: #ef4444 !important; /* red-500 */
+            color: #b91c1c; /* red-700 */
+        }
+        
+        /* Styles for the celebration overlay */
+        #celebration-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .firework {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            opacity: 0;
+            animation: firework-burst 1.5s ease-out forwards;
+        }
+        @keyframes firework-burst {
+            0% { transform: scale(0.1); opacity: 1; }
+            100% { transform: translate(var(--x), var(--y)) scale(1); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Celebration Overlay -->
+    <div id="celebration-overlay">
+        <!-- Firework particles will be added here by JS -->
+    </div>
+
+    <!-- Main Quiz Container -->
+    <div id="quiz-container" class="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
+        
+        <!-- Header Section -->
+        <div class="mb-6 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-700">Maturalny Trener Matematyki</h1>
+            <p class="text-slate-500 mt-2">Zdobądź 15 punktów, aby zaliczyć ten trening!</p>
+        </div>
+
+        <!-- Score and Timer Section -->
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 p-4 bg-slate-50 rounded-lg">
+            <div class="mb-3 sm:mb-0">
+                <span class="font-bold text-lg">Punkty: </span>
+                <span id="score" class="text-2xl font-bold text-blue-600">0 / 15</span>
+            </div>
+            <div>
+                <span class="font-bold text-lg">Czas: </span>
+                <span id="timer" class="text-2xl font-bold text-red-600">03:00</span>
+            </div>
+        </div>
+
+        <!-- Question Section -->
+        <div id="question-area" class="mb-6">
+            <p id="question-source" class="text-sm text-slate-400 mb-2"></p>
+            <p id="question-text" class="text-lg md:text-xl font-semibold leading-relaxed"></p>
+            <div id="question-image" class="mt-4 flex justify-center"></div>
+        </div>
+        
+        <!-- Answers Section -->
+        <div id="answers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <!-- Answer buttons will be dynamically inserted here -->
+        </div>
+
+        <!-- Action Button -->
+        <div class="mt-8 text-center">
+            <button id="check-answer-btn" class="w-full sm:w-auto bg-blue-600 text-white font-bold py-3 px-10 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-transform transform hover:scale-105 disabled:bg-slate-400 disabled:cursor-not-allowed disabled:scale-100">
+                Sprawdź odpowiedź
+            </button>
+        </div>
+
+    </div>
+    
+    <!-- Success Modal -->
+    <div id="success-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md w-full">
+            <h2 class="text-2xl sm:text-3xl font-bold text-green-600 mb-4">Gratulacje! To był świetny trening!</h2>
+            <button id="restart-btn" class="bg-green-600 text-white font-bold py-3 px-10 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-transform transform hover:scale-105">
+                Zagraj jeszcze raz
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DATA ---
+        // Pula pytań z matur
+        const questions = [
+            {
+                source: "Matura - Czerwiec 2024",
+                question: "Liczba $2^{-1} \\cdot 32^{\\frac{3}{5}}$ jest równa",
+                answers: [ { text: "(-16)", correct: false }, { text: "(-4)", correct: false }, { text: "2", correct: false }, { text: "4", correct: true } ]
+            },
+            {
+                source: "Matura - Maj 2024",
+                question: "Liczba $(\\frac{1}{16})^{8} \\cdot 8^{16}$ jest równa",
+                answers: [ { text: "$2^{24}$", correct: false }, { text: "$2^{16}$", correct: true }, { text: "$2^{12}$", correct: false }, { text: "$2^{8}$", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2024",
+                question: "Liczba $(\\frac{4}{25})^{-0,5}$ jest równa",
+                answers: [ { text: "0,04", correct: false }, { text: "0,8", correct: false }, { text: "2,5", correct: true }, { text: "0,4", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2024",
+                question: "Liczba $\\log_{3}(\\frac{3}{2}) + \\log_{3}(\\frac{2}{9})$ jest równa",
+                answers: [ { text: "$\\log_{3}\\frac{31}{18}$", correct: false }, { text: "$\\log_{3}\\frac{5}{11}$", correct: false }, { text: "(-1)", correct: true }, { text: "$\\frac{1}{3}$", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2024",
+                question: "Liczba $\\log_{\\sqrt{3}}9$ jest równa",
+                answers: [ { text: "2", correct: false }, { text: "3", correct: false }, { text: "4", correct: true }, { text: "9", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2024",
+                question: "Liczba $(2\\sqrt{10} + \\sqrt{2})^{2}$ jest równa",
+                answers: [ { text: "22", correct: false }, { text: "42", correct: false }, { text: "$42 + 4\\sqrt{5}$", correct: false }, { text: "$42 + 8\\sqrt{5}$", correct: true } ]
+            },
+            {
+                source: "Matura - Sierpień 2024",
+                question: "Liczba wszystkich całkowitych rozwiązań nierówności $|x+1|<3$ jest równa",
+                answers: [ { text: "2", correct: false }, { text: "3", correct: false }, { text: "5", correct: true }, { text: "7", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2024",
+                question: "Liczba 2 jest miejscem zerowym funkcji liniowej $f(x)=(3-m)x+4$. Liczba m jest równa",
+                answers: [ { text: "0", correct: false }, { text: "3", correct: false }, { text: "4", correct: false }, { text: "5", correct: true } ]
+            },
+            {
+                source: "Matura - Maj 2024",
+                question: "Funkcje liniowe $f(x)=3x+6$ oraz $g(x)=ax+7$ mają to samo miejsce zerowe. Współczynnik a we wzorze funkcji g jest równy",
+                answers: [ { text: "$(-\\frac{7}{2})$", correct: true }, { text: "$(-\\frac{2}{7})$", correct: false }, { text: "$\\frac{2}{7}$", correct: false }, { text: "$\\frac{7}{2}$", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2024",
+                question: "W ciągu arytmetycznym $(a_n)$, dane są wyrazy: $a_1=7$ oraz $a_2=13$. Wyraz $a_{10}$ jest równy",
+                answers: [ { text: "(-47)", correct: false }, { text: "52", correct: false }, { text: "61", correct: true }, { text: "67", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2024",
+                question: "Dany jest ciąg geometryczny $(a_n)$, w którym $a_2=2$ oraz $a_5=54$. Iloraz ciągu $(a_n)$ jest równy",
+                answers: [ { text: "3", correct: true }, { text: "9", correct: false }, { text: "$\\frac{52}{3}$", correct: false }, { text: "27", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2024",
+                question: "Dany jest równoległobok o bokach długości 3 i 4 oraz o kącie między nimi o mierze $120^{\\circ}$. Pole tego równoległoboku jest równe",
+                answers: [ { text: "12", correct: false }, { text: "$12\\sqrt{3}$", correct: false }, { text: "6", correct: false }, { text: "$6\\sqrt{3}$", correct: true } ]
+            },
+            {
+                source: "Matura - Czerwiec 2024",
+                question: "Przekątna ściany sześcianu ma długość $2\\sqrt{2}$. Objętość tego sześcianu jest równa",
+                answers: [ { text: "8", correct: true }, { text: "24", correct: false }, { text: "$\\frac{16\\sqrt{6}}{9}$", correct: false }, { text: "$16\\sqrt{2}$", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2024",
+                question: "Rozważamy wszystkie kody czterocyfrowe utworzone tylko z cyfr 1, 3, 6, 8, przy czym w każdym kodzie każda z tych cyfr występuje dokładnie jeden raz. Liczba wszystkich takich kodów jest równa",
+                answers: [ { text: "4", correct: false }, { text: "10", correct: false }, { text: "24", correct: true }, { text: "16", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2024",
+                question: "W pudełku znajdują się wyłącznie kule białe i czarne. Kul czarnych jest 18. Prawdopodobieństwo zdarzenia polegającego na tym, że wyciągniemy kulę czarną, jest równe $\\frac{3}{5}$. Liczba kul białych w pudełku, przed wyciągnięciem jednej kuli, była równa",
+                answers: [ { text: "9", correct: false }, { text: "12", correct: true }, { text: "15", correct: false }, { text: "30", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2022 (Próbna)",
+                question: "Liczba $(5\\cdot5^{\\frac{1}{2}})^{\\frac{1}{3}}$ jest równa",
+                answers: [ { text: "$\\sqrt[6]{5}$", correct: false }, { text: "$\\sqrt[3]{25}$", correct: false }, { text: "$\\sqrt{5}$", correct: true }, { text: "$\\sqrt[3]{5}$", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2022 (Próbna)",
+                question: "Pan Nowak kupił obligacje Skarbu Państwa za 40 000 zł oprocentowane 7% w skali roku. Odsetki są naliczane i kapitalizowane co rok. Wartość obligacji kupionych przez pana Nowaka będzie po dwóch latach równa",
+                answers: [ { text: "$40000 \\cdot (1,07)^{2}$ zł", correct: true }, { text: "$40000 \\cdot (1,7)^{2}$ zł", correct: false }, { text: "$40000 \\cdot 1,14$ zł", correct: false }, { text: "$40000 \\cdot 1,49$ zł", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2023",
+                question: "Liczba $\\sqrt[3]{-\\frac{27}{16}} \\cdot \\sqrt[3]{2}$ jest równa",
+                answers: [ { text: "$(-\\frac{3}{2})$", correct: true }, { text: "$\\frac{3}{2}$", correct: false }, { text: "$\\frac{2}{3}$", correct: false }, { text: "$(-\\frac{2}{3})$", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2023",
+                question: "Liczba $log_{9}27 + log_{9}3$ jest równa",
+                answers: [ { text: "81", correct: false }, { text: "9", correct: false }, { text: "4", correct: false }, { text: "2", correct: true } ]
+            },
+            {
+                source: "Matura - Czerwiec 2023",
+                question: "Wszystkich liczb całkowitych dodatnich spełniających nierówność $|x+5|<15$ jest",
+                answers: [ { text: "9", correct: true }, { text: "10", correct: false }, { text: "20", correct: false }, { text: "21", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "Liczba $3\\sqrt{45} - \\sqrt{20}$ jest równa",
+                answers: [ { text: "$(7 \\cdot 5)^{\\frac{1}{2}}$", correct: false }, { text: "$5^{\\frac{1}{2}}$", correct: false }, { text: "7", correct: false }, { text: "$7 \\cdot 5^{\\frac{1}{2}}$", correct: true } ]
+            },
+            {
+                source: "Matura - Grudzień 2023 (Próbna)",
+                question: "Liczba $(3^{-2,4} \\cdot 3^{\\frac{2}{5}})^{\\frac{1}{2}}$ jest równa",
+                answers: [ { text: "$\\sqrt{3}$", correct: false }, { text: "$\\frac{\\sqrt{3}}{3}$", correct: false }, { text: "$\\frac{1}{3}$", correct: true }, { text: "0,3", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2022 (Próbna)",
+                question: "Wyrażenie $\\frac{1}{x-y}+\\frac{1}{x+y}$ można przekształcić do postaci",
+                answers: [ { text: "$\\frac{2}{x-y}$", correct: false }, { text: "$\\frac{2}{x^{2}-y^{2}}$", correct: false }, { text: "$\\frac{2x}{x^{2}-y^{2}}$", correct: true }, { text: "$\\frac{-2xy}{x+y}$", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2022 (Próbna)",
+                question: "Wartość funkcji $f(x)=-log~x$ dla argumentu $x=\\sqrt{10}$ jest równa",
+                answers: [ { text: "2", correct: false }, { text: "$(-\\frac{1}{2})$", correct: true }, { text: "$\\frac{1}{2}$", correct: false }, { text: "$(-2)$", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2022 (Próbna)",
+                question: "Największą liczbą całkowitą, która spełnia nierówność $8-\\frac{1-2x}{2}\\ge3x$ jest",
+                answers: [ { text: "1", correct: false }, { text: "2", correct: false }, { text: "3", correct: true }, { text: "4", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2022 (Próbna)",
+                question: "Pole powierzchni części wspólnej koła o promieniu 8 i kwadratu o boku 8, których środki się pokrywają, jest równe",
+                answers: [ { text: "$16\\pi$", correct: true }, { text: "$8\\pi$", correct: false }, { text: "$4\\sqrt{2}\\pi$", correct: false }, { text: "$16\\sqrt{2}\\pi$", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2022 (Próbna)",
+                question: "Na loterii stosunek liczby losów wygrywających do liczby losów przegrywających jest równy $2:7$. Prawdopodobieństwo, że zakupiony los jest wygrywający, jest równe",
+                answers: [ { text: "$\\frac{1}{9}$", correct: false }, { text: "$\\frac{1}{2}$", correct: false }, { text: "$\\frac{2}{9}$", correct: true }, { text: "$\\frac{2}{7}$", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2023",
+                question: "Liczba $(1+\\sqrt{5})^{2}-(1-\\sqrt{5})^{2}$ jest równa",
+                answers: [ { text: "0", correct: false }, { text: "$(-10)$", correct: false }, { text: "$4\\sqrt{5}$", correct: true }, { text: "$2+2\\sqrt{5}$", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2023",
+                question: "Trzywyrazowy ciąg $(1,4,a+5)$ jest arytmetyczny. Liczba a jest równa",
+                answers: [ { text: "0", correct: false }, { text: "7", correct: false }, { text: "2", correct: true }, { text: "11", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2023",
+                question: "Pole równoległoboku ABCD jest równe $40\\sqrt{6}$. Bok AD ma długość 10, a kąt ABC ma miarę $135^{\\circ}$. Długość boku AB jest równa",
+                answers: [ { text: "$8\\sqrt{3}$", correct: true }, { text: "$8\\sqrt{2}$", correct: false }, { text: "$16\\sqrt{2}$", correct: false }, { text: "$16\\sqrt{3}$", correct: false } ]
+            },
+            {
+                source: "Matura - Czerwiec 2023",
+                question: "Wszystkich liczb naturalnych trzycyfrowych o sumie cyfr równej 3 jest",
+                answers: [ { text: "8", correct: false }, { text: "4", correct: false }, { text: "5", correct: false }, { text: "6", correct: true } ]
+            },
+            {
+                source: "Matura - Grudzień 2023 (Próbna)",
+                question: "Liczba $log_{2}96-log_{2}3$ jest równa",
+                answers: [ { text: "$log_{2}93$", correct: false }, { text: "$log_{2}30$", correct: false }, { text: "4", correct: false }, { text: "5", correct: true } ]
+            },
+            {
+                source: "Matura - Grudzień 2023 (Próbna)",
+                question: "Trzywyrazowy ciąg $(1-2a,12,48)$ jest geometryczny. Liczba a jest równa",
+                answers: [ { text: "$(-1)$", correct: true }, { text: "3", correct: false }, { text: "4", correct: false }, { text: "12,5", correct: false } ]
+            },
+            {
+                source: "Matura - Grudzień 2023 (Próbna)",
+                question: "W kartezjańskim układzie współrzędnych (x, y) dany jest okrąg o środku w punkcie $S=(4,-2)$. Okrąg jest styczny do osi Ox. Równanie tego okręgu to:",
+                answers: [ { text: "$(x-4)^{2}+(y+2)^{2}=4$", correct: true }, { text: "$(x-4)^{2}+(y+2)^{2}=2$", correct: false }, { text: "$(x+4)^{2}+(y-2)^{2}=4$", correct: false }, { text: "$(x+4)^{2}+(y-2)^{2}=2$", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2023",
+                question: "Dla każdej liczby rzeczywistej a wyrażenie $(2a-3)^{2}-(2a+3)^{2}$ jest równe",
+                answers: [ { text: "$-24a$", correct: true }, { text: "0", correct: false }, { text: "18", correct: false }, { text: "$16a^{2}-24a$", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2023",
+                question: "Jednym z rozwiązań równania $\\sqrt{3}(x^{2}-2)(x+3)=0$ jest liczba",
+                answers: [ { text: "3", correct: false }, { text: "2", correct: false }, { text: "$\\sqrt{3}$", correct: false }, { text: "$\\sqrt{2}$", correct: true } ]
+            },
+            {
+                source: "Matura - Maj 2023",
+                question: "Jednym z miejsc zerowych funkcji kwadratowej f jest liczba (-5). Pierwsza współrzędna wierzchołka paraboli, będącej wykresem funkcji f, jest równa 3. Drugim miejscem zerowym funkcji f jest liczba",
+                answers: [ { text: "11", correct: true }, { text: "1", correct: false }, { text: "$(-1)$", correct: false }, { text: "$(-13)$", correct: false } ]
+            },
+            {
+                source: "Matura - Maj 2023",
+                question: "Wszystkich liczb naturalnych pięciocyfrowych, w których zapisie dziesiętnym występują tylko cyfry 0, 5, 7 (np. 57075, 55 555), jest",
+                answers: [ { text: "$5^{3}$", correct: false }, { text: "$2\\cdot4^{3}$", correct: false }, { text: "$2\\cdot3^{4}$", correct: true }, { text: "$3^{5}$", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "Liczba $log_{25}1-\\frac{1}{2}log_{25}5$ jest równa",
+                answers: [ { text: "$(-\\frac{1}{4})$", correct: true }, { text: "$(-\\frac{1}{2})$", correct: false }, { text: "$\\frac{1}{4}$", correct: false }, { text: "$\\frac{1}{2}$", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "Wartość wyrażenia $(2-\\sqrt{3})^{2}-(\\sqrt{3}-2)^{2}$ jest równa",
+                answers: [ { text: "$(-2\\sqrt{3})$", correct: false }, { text: "0", correct: true }, { text: "6", correct: false }, { text: "$8\\sqrt{3}$", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "Miejscem zerowym funkcji liniowej f jest liczba 1. Wykres tej funkcji przechodzi przez punkt $(-1,4)$. Wzór funkcji f ma postać",
+                answers: [ { text: "$f(x)=-\\frac{1}{2}x+1$", correct: false }, { text: "$f(x)=-\\frac{1}{3}x+\\frac{1}{3}$", correct: false }, { text: "$f(x)=-2x+2$", correct: true }, { text: "$f(x)=-3x+1$", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "Kąt a jest ostry i $cos~\\alpha=\\frac{2\\sqrt{6}}{7}$. Sinus kąta a jest równy",
+                answers: [ { text: "$\\frac{24}{49}$", correct: false }, { text: "$\\frac{5}{7}$", correct: true }, { text: "$\\frac{25}{49}$", correct: false }, { text: "$\\frac{\\sqrt{6}}{7}$", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "Pole trójkąta równobocznego $T_{1}$ jest równe $\\frac{(4,5)^{2}\\cdot\\sqrt{3}}{4}$. Pole trójkąta równobocznego $T_{2}$ jest równe $\\frac{(1,5)^{2}\\cdot\\sqrt{3}}{4}$. Skala podobieństwa trójkąta $T_2$ do $T_1$ wynosi:",
+                answers: [ { text: "3", correct: false }, { text: "1/3", correct: true }, { text: "9", correct: false }, { text: "1/9", correct: false } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "W kartezjańskim układzie współrzędnych (x, y) punkt $A=(-1,-4)$ jest wierzchołkiem równoległoboku ABCD. Punkt $S=(2,2)$ jest środkiem symetrii tego równoległoboku. Długość przekątnej AC jest równa",
+                answers: [ { text: "$\\sqrt{5}$", correct: false }, { text: "$2\\sqrt{5}$", correct: false }, { text: "$3\\sqrt{5}$", correct: false }, { text: "$6\\sqrt{5}$", correct: true } ]
+            },
+            {
+                source: "Matura - Sierpień 2023",
+                question: "Wszystkich liczb naturalnych czterocyfrowych, w których zapisie dziesiętnym cyfry się nie powtarzają, jest",
+                answers: [ { text: "$9\\cdot10\\cdot10\\cdot10\\cdot10$", correct: false }, { text: "$9\\cdot9\\cdot9\\cdot9$", correct: false }, { text: "$10\\cdot9\\cdot8\\cdot7$", correct: false }, { text: "$9\\cdot9\\cdot8\\cdot7$", correct: true } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Wartość wyrażenia $6^{100}+6^{100}+6^{100}+6^{100}+6^{100}+6^{100}$ jest równa",
+                answers: [ { text: "$6^{600}$", correct: false }, { text: "$6^{101}$", correct: true }, { text: "$36^{100}$", correct: false }, { text: "$36^{600}$", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Wartość wyrażenia $log_{7}98 - log_{7}2$ jest równa",
+                answers: [ { text: "7", correct: false }, { text: "2", correct: true }, { text: "1", correct: false }, { text: "(-1)", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Wszystkich liczb naturalnych trzycyfrowych, w których zapisie dziesiętnym nie występuje cyfra 2, jest",
+                answers: [ { text: "900", correct: false }, { text: "729", correct: false }, { text: "648", correct: true }, { text: "512", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Dla każdej liczby rzeczywistej a wartość wyrażenia $(3+4a)^{2}-(3-4a)^{2}$ jest równa",
+                answers: [ { text: "$32a^{2}$", correct: false }, { text: "0", correct: false }, { text: "48a", correct: true }, { text: "$8a^{2}$", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Dany jest wielomian $W(x)=3x^{3}+kx^{2}-12x-7k+12$. Wiadomo, że liczba (-2) jest pierwiastkiem tego wielomianu. Liczba k jest równa",
+                answers: [ { text: "2", correct: false }, { text: "4", correct: true }, { text: "6", correct: false }, { text: "8", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Równanie $\\frac{(4x-6)(x-2)^{2}}{2x(x-1,5)(x+6)}=0$ ma w zbiorze liczb rzeczywistych",
+                answers: [ { text: "dokładnie jedno rozwiązanie: $x=2$", correct: true }, { text: "dokładnie dwa rozwiązania: $x=1,5$, $x=2$.", correct: false }, { text: "dokładnie trzy rozwiązania: $x=-6,$ $x=0$, $x=2$.", correct: false }, { text: "dokładnie cztery rozwiązania: $x=-6,$ $x=0$ $x=1,5$, $x=2$.", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Na którym rysunku prawidłowo zaznaczono zbiór rozwiązań nierówności $|x+1|\\le2$?",
+                answers: [ { text: "A", correct: false }, { text: "B", correct: false }, { text: "C", correct: true }, { text: "D", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Funkcja liniowa f jest określona wzorem $f(x)=ax+b$. Na podstawie rysunku wskaż warunki, które spełniają współczynniki a i b.",
+                answers: [ { text: "$a>0$ i $b>0$.", correct: false }, { text: "$a>0$ i $b<0$.", correct: true }, { text: "$a<0$ i $b>0$.", correct: false }, { text: "$a<0$ i $b<0$.", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Firma przeprowadziła badania rynkowe. Z badań wynika, że każdorazowe zwiększenie ceny o 1 jednostkę powoduje spadek liczby kupujących o 3 jednostki. Przy cenie równej 5, liczba kupujących jest równa 12. Funkcja opisująca zależność liczby kupujących (Q) od ceny (P) ma wzór:",
+                answers: [ { text: "$Q=-0,9P^{2}+6,9$", correct: false }, { text: "$Q=-3P+27$", correct: true }, { text: "$P=-0,9Q^{2}+6,9$", correct: false }, { text: "$P=-3Q+27$", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Klient wpłacił do banku 20 000 zł na lokatę dwuletnią. Po każdym rocznym okresie oszczędzania bank dolicza odsetki w wysokości 3%. Po 2 latach kwota na lokacie jest równa",
+                answers: [ { text: "$20 000\\cdot(1,12)^{2}$", correct: false }, { text: "$20 000 \\cdot 1,03$", correct: false }, { text: "$20 000 \\cdot 1,06$", correct: false }, { text: "$20 000\\cdot(1,03)^{2}$", correct: true } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "Dany jest trójkąt ABC, w którym $|AB|=6, |BC|=5, |AC|=10$. Czy trójkąt jest rozwartokątny?",
+                answers: [ { text: "Tak", correct: true }, { text: "Nie", correct: false } ]
+            },
+            {
+                source: "Matura - Przykładowy Arkusz CKE 2023",
+                question: "W kartezjańskim układzie współrzędnych (x, y) dany jest kwadrat ABCD. Wierzchołki $A=(-2,1)$ i $C=(4,5)$ są końcami przekątnej. Długość przekątnej kwadratu ABCD jest równa",
+                answers: [ { text: "10", correct: false }, { text: "$2\\sqrt{13}$", correct: true }, { text: "$2\\sqrt{10}$", correct: false }, { text: "8", correct: false } ]
+            }
+        ];
+
+        // --- DOM Elements ---
+        const quizContainer = document.getElementById('quiz-container');
+        const scoreElement = document.getElementById('score');
+        const timerElement = document.getElementById('timer');
+        const questionSourceElement = document.getElementById('question-source');
+        const questionTextElement = document.getElementById('question-text');
+        const questionImageElement = document.getElementById('question-image');
+        const answersContainer = document.getElementById('answers-container');
+        const checkAnswerBtn = document.getElementById('check-answer-btn');
+        const successModal = document.getElementById('success-modal');
+        const restartBtn = document.getElementById('restart-btn');
+        const celebrationOverlay = document.getElementById('celebration-overlay');
+
+        // --- State ---
+        let currentQuestionIndex = 0;
+        let score = 0;
+        const scoreGoal = 15;
+        let timerInterval;
+        let timeLeft = 180;
+        let shuffledQuestions = [];
+
+        // --- Functions ---
+
+        /**
+         * Shuffles an array in place.
+         * @param {Array} array The array to shuffle.
+         */
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+        
+        /**
+         * Starts the quiz.
+         */
+        function startQuiz() {
+            score = 0;
+            currentQuestionIndex = 0;
+            shuffledQuestions = [...questions];
+            shuffleArray(shuffledQuestions);
+            updateScore();
+            successModal.classList.add('hidden');
+            quizContainer.classList.remove('hidden');
+            loadQuestion();
+        }
+
+        /**
+         * Loads the current question and its answers.
+         */
+        function loadQuestion() {
+            if (currentQuestionIndex >= shuffledQuestions.length) {
+                // If we run out of questions, reshuffle and start over
+                currentQuestionIndex = 0;
+                shuffleArray(shuffledQuestions);
+            }
+
+            resetState();
+            const currentQuestion = shuffledQuestions[currentQuestionIndex];
+            
+            questionSourceElement.textContent = currentQuestion.source;
+            questionTextElement.innerHTML = currentQuestion.question;
+            questionImageElement.innerHTML = currentQuestion.image || '';
+
+            currentQuestion.answers.forEach(answer => {
+                const button = document.createElement('button');
+                button.innerHTML = answer.text;
+                button.classList.add('quiz-option-btn', 'w-full', 'p-4', 'bg-slate-100', 'rounded-lg', 'text-left', 'hover:bg-slate-200', 'focus:outline-none', 'focus:ring-2', 'focus:ring-blue-400');
+                button.dataset.correct = answer.correct;
+                button.addEventListener('click', selectAnswer);
+                answersContainer.appendChild(button);
+            });
+            
+            // Render LaTeX using MathJax
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                MathJax.typesetPromise([questionTextElement, answersContainer]).catch(err => console.error('Błąd renderowania MathJax:', err));
+            }
+            
+            startTimer();
+        }
+        
+        /**
+         * Resets the state for a new question.
+         */
+        function resetState() {
+            clearInterval(timerInterval);
+            timeLeft = 180;
+            updateTimerDisplay();
+            answersContainer.innerHTML = '';
+            checkAnswerBtn.disabled = true;
+        }
+        
+        /**
+         * Starts the timer for the current question.
+         */
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+        
+        /**
+         * Updates the timer display.
+         */
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            if(timeLeft < 30) {
+                timerElement.classList.add('animate-pulse');
+            } else {
+                timerElement.classList.remove('animate-pulse');
+            }
+        }
+        
+        /**
+         * Handles the case when the time runs out.
+         */
+        function handleTimeOut() {
+            Array.from(answersContainer.children).forEach(button => {
+                button.disabled = true;
+                if (button.dataset.correct === 'true') {
+                    button.classList.add('correct');
+                }
+            });
+            checkAnswerBtn.disabled = true;
+            setTimeout(nextQuestion, 2000);
+        }
+
+        /**
+         * Handles the selection of an answer.
+         * @param {Event} e The click event.
+         */
+        function selectAnswer(e) {
+            const selectedBtn = e.target;
+            Array.from(answersContainer.children).forEach(button => {
+                button.classList.remove('selected');
+            });
+            selectedBtn.classList.add('selected');
+            checkAnswerBtn.disabled = false;
+        }
+        
+        /**
+         * Checks the selected answer.
+         */
+        function checkAnswer() {
+            clearInterval(timerInterval);
+            const selectedBtn = answersContainer.querySelector('.selected');
+            if (!selectedBtn) return;
+
+            const isCorrect = selectedBtn.dataset.correct === 'true';
+
+            Array.from(answersContainer.children).forEach(button => {
+                button.disabled = true;
+                if (button.dataset.correct === 'true') {
+                    button.classList.add('correct');
+                }
+            });
+
+            if (isCorrect) {
+                score++;
+                updateScore();
+                triggerFireworks();
+            } else {
+                selectedBtn.classList.add('incorrect');
+            }
+            
+            checkAnswerBtn.disabled = true;
+
+            if (score >= scoreGoal) {
+                setTimeout(showSuccessModal, 1500);
+            } else {
+                setTimeout(nextQuestion, 2000);
+            }
+        }
+        
+        /**
+         * Updates the score display.
+         */
+        function updateScore() {
+            scoreElement.textContent = `${score} / ${scoreGoal}`;
+        }
+        
+        /**
+         * Moves to the next question.
+         */
+        function nextQuestion() {
+            currentQuestionIndex++;
+            loadQuestion();
+        }
+
+        /**
+         * Shows the success modal when the score goal is reached.
+         */
+        function showSuccessModal() {
+            quizContainer.classList.add('hidden');
+            successModal.classList.remove('hidden');
+        }
+
+        /**
+         * Triggers a firework celebration for a correct answer.
+         */
+        function triggerFireworks() {
+            celebrationOverlay.style.display = 'flex';
+            celebrationOverlay.innerHTML = ''; // Clear previous fireworks
+
+            const fireworkCount = 50;
+            const colors = ['#facc15', '#4ade80', '#60a5fa', '#f87171', '#a78bfa'];
+
+            for (let i = 0; i < fireworkCount; i++) {
+                const firework = document.createElement('div');
+                firework.classList.add('firework');
+                
+                const angle = Math.random() * 360;
+                const distance = Math.random() * 150 + 50;
+                
+                firework.style.setProperty('--x', `${Math.cos(angle * Math.PI / 180) * distance}px`);
+                firework.style.setProperty('--y', `${Math.sin(angle * Math.PI / 180) * distance}px`);
+                firework.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                celebrationOverlay.appendChild(firework);
+            }
+            
+            setTimeout(() => {
+                celebrationOverlay.style.display = 'none';
+                celebrationOverlay.innerHTML = '';
+            }, 2000);
+        }
+
+        // --- Event Listeners ---
+        checkAnswerBtn.addEventListener('click', checkAnswer);
+        restartBtn.addEventListener('click', startQuiz);
+
+        // --- MathJax Configuration & Initialization ---
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            svg: {
+                fontCache: 'global'
+            },
+            startup: {
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                    startQuiz();
+                }
+            }
+        };
+        
+        (function () {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+            script.async = true;
+            script.id = 'MathJax-script';
+            document.head.appendChild(script);
+        })();
+
+    </script>
+</body>
+</html>
